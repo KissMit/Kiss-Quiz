@@ -978,8 +978,24 @@ function pickScale(btn, group) {
   btn.classList.add('sel');
 }
 
-/* ── DRAG & DROP BINGO ── */
+/* ── DRAG & DROP BINGO — mouse + touch support ── */
 let draggedId = null;
+
+function placeCircle(cell) {
+  if (!draggedId) return;
+  const row = cell.dataset.row;
+  document.querySelectorAll(`.bid[data-row="${row}"] .placed`).forEach(p => p.remove());
+  const src = document.querySelector(`.drag-circle[data-id="${draggedId}"]`);
+  if (!src) return;
+  const clone = document.createElement('div');
+  clone.className = 'placed';
+  clone.style.background = src.style.background;
+  cell.appendChild(clone);
+  src.style.opacity = '0.25';
+  draggedId = null;
+}
+
+// Mouse drag events
 document.querySelectorAll('.drag-circle').forEach(c => {
   c.addEventListener('dragstart', e => {
     draggedId = c.dataset.id;
@@ -995,21 +1011,49 @@ document.querySelectorAll('.bid[data-row]').forEach(cell => {
   cell.addEventListener('drop', e => {
     e.preventDefault();
     cell.classList.remove('drag-over');
-    if (!draggedId) return;
-    const row = cell.dataset.row;
-    // Remove any previous circle in same row
-    document.querySelectorAll(`.bid[data-row="${row}"] .placed`).forEach(p => p.remove());
-    // Find the dragged circle
-    const src = document.querySelector(`.drag-circle[data-id="${draggedId}"]`);
-    if (!src) return;
-    const clone = document.createElement('div');
-    clone.className = 'placed';
-    clone.style.background = src.style.background;
-    cell.appendChild(clone);
-    // Hide original from pool
-    src.style.opacity = '0.25';
-    draggedId = null;
+    placeCircle(cell);
   });
+});
+
+// Touch events for mobile
+document.querySelectorAll('.drag-circle').forEach(c => {
+  c.addEventListener('touchstart', e => {
+    draggedId = c.dataset.id;
+    c.classList.add('dragging');
+    c.style.opacity = '0.6';
+  }, { passive: true });
+
+  c.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    c.style.position = 'fixed';
+    c.style.zIndex = '9999';
+    c.style.left = (touch.clientX - c.offsetWidth / 2) + 'px';
+    c.style.top = (touch.clientY - c.offsetHeight / 2) + 'px';
+    c.style.pointerEvents = 'none';
+  }, { passive: false });
+
+  c.addEventListener('touchend', e => {
+    c.style.pointerEvents = '';
+    c.style.opacity = '';
+    const touch = e.changedTouches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    const cell = el ? el.closest('.bid[data-row]') : null;
+    // Reset circle position
+    c.style.position = 'absolute';
+    c.style.zIndex = '';
+    c.style.left = c.dataset.origLeft || c.style.left;
+    c.style.top = c.dataset.origTop || c.style.top;
+    c.classList.remove('dragging');
+    if (cell) placeCircle(cell);
+    else draggedId = null;
+  });
+});
+
+// Store original positions for reset after touch
+document.querySelectorAll('.drag-circle').forEach(c => {
+  c.dataset.origLeft = c.style.left;
+  c.dataset.origTop = c.style.top;
 });
 
 /* ── ARCHETYPES ── */
